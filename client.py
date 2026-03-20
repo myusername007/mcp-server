@@ -30,21 +30,35 @@ async def main():
                 for t in mcp_tools.tools
             ]
             
-            # Передаємо tools в Claude
-            response = client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=512,
-                tools=claude_tools,  # <-- ось це було відсутнє
-                messages=[{"role": "user", "content": "What's the weather in Kyiv and what is 25 * 4?"}]
-            )
-            
-            # Якщо Claude хоче викликати tool
-            if response.stop_reason == "tool_use":
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"Calling: {block.name}({block.input})")
-                        # Викликаємо через MCP сесію
-                        result = await session.call_tool(block.name, block.input)
-                        print(f"Result: {result.content[0].text}")
+            user_input = input("You: ")
+            messages = [{"role": "user", "content": user_input}]
+
+            while True:
+                response = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=512,
+                    tools=claude_tools,
+                    messages=messages
+                )
+                
+                if response.stop_reason == "end_turn":
+                    print(f"\nClaude: {response.content[0].text}")
+                    break
+                
+                if response.stop_reason == "tool_use":
+                    messages.append({"role": "assistant", "content": response.content})
+                    tool_results = []
+                    
+                    for block in response.content:
+                        if block.type == "tool_use":
+                            print(f">>> Calling: {block.name}({block.input})")
+                            result = await session.call_tool(block.name, block.input)
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result.content[0].text
+                            })
+                    
+                    messages.append({"role": "user", "content": tool_results})
 
 asyncio.run(main())
