@@ -2,7 +2,7 @@ from mcp.server.fastmcp import FastMCP
 import json
 import os
 
-NOTES_FILE = "notes.json"
+NOTES_FILE = "/Users/root7/mcp_server/notes.json"
 
 
 mcp = FastMCP("My First MCP Server")
