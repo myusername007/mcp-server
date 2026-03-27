@@ -1,8 +1,10 @@
 from mcp.server.fastmcp import FastMCP
 import json
 import os
+import sqlite3
 
 NOTES_FILE = "/Users/root7/mcp_server/notes.json"
+DB_FILE = "/Users/root7/mcp_server/tasks.db"
 
 
 mcp = FastMCP("My First MCP Server")
@@ -14,6 +16,18 @@ def load_notes() -> dict:
             return json.load(f)
     return {}
 
+
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tasks(
+            id INTEGER PRIMARY KEY AUTOINCREMENT ,
+            title TEXT NOT NULL,
+            done INTEGER DEFAULT 0 
+        )
+    """)
+    conn.commit()
+    return conn
 
 @mcp.tool()
 def save_note(title: str, content: str) -> str:
@@ -62,6 +76,60 @@ def calculate(expression: str) -> str:
         return str(result)
     except:
         return "Invalid expression"
+
+#db tools
+@mcp.tool()
+def add_task(title: str) -> str:
+    """"Add a new task"""
+    conn = get_db()
+    conn.execute("INSERT INTO tasks (title) VALUES (?)", (title,))
+    conn.commit()
+    conn.close()
+    return f"Task '{title}' added"
+
+
+@mcp.tool()
+def get_tasks() -> str:
+    """Print all tasks"""
+    conn = get_db()
+    cursor = conn.execute("SELECT id, title, done FROM tasks")
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    if not rows:
+        return "No tasks"
+    
+    result = []
+    for task_id, title, done in rows:
+        mark = "x" if done else " "
+        result.append(f"{task_id}. [{mark}] {title}")
+
+    return "\n".join(result)
+    
+@mcp.tool()
+def complete_task(task_id: int) -> str:
+    """Mark task as done"""
+    conn = get_db()
+    cursor = conn.execute("UPDATE tasks SET done = 1 WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    if cursor.rowcount == 0:
+        return "Task not found"
+    return f"Task {task_id} is done!"
+
+@mcp.tool()
+def delete_task(task_id: int) -> str:
+    """Delete task"""
+    conn = get_db()
+    cursor = conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
+    conn.commit()
+    conn.close()
+    if cursor.rowcount == 0:
+        return "Task not found"
+    return f"Task {task_id} was deleted!"
+
+
 
 if __name__ == "__main__":
     mcp.run()
