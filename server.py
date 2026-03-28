@@ -2,9 +2,13 @@ from mcp.server.fastmcp import FastMCP
 import json
 import os
 import sqlite3
+import requests
+from dotenv import load_dotenv
+load_dotenv("/Users/root7/mcp_server/.env")
 
 NOTES_FILE = "/Users/root7/mcp_server/notes.json"
 DB_FILE = "/Users/root7/mcp_server/tasks.db"
+WEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 
 mcp = FastMCP("My First MCP Server")
@@ -60,13 +64,25 @@ def list_notes() -> str:
 @mcp.tool()
 def get_weather(city: str) -> str:
     """Get current weather for a city"""
-    weather_data = {
-        "Kyiv": "Rainy, 12°C",
-        "London": "Cloudy, 15°C",
-        "Lviv": "Sunny, 18°C"
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": WEATHER_API_KEY,
+        "units": "metric",
+        "lang": "ua"
     }
-    return weather_data.get(city, "Unknown city")
+    response = requests.get(url, params=params)
+    
+    if response.status_code != 200:
+        return f"Could not get weather for {city}"
+    
+    data = response.json()
+    temp = data["main"]["temp"]
+    feels_like = data["main"]["feels_like"]
+    description = data["weather"][0]["description"]
+    humidity = data["main"]["humidity"]
 
+    return f"{city}: {description}, {temp}°C (відчувається як {feels_like}°C), вологість {humidity}%"
 
 @mcp.tool()
 def calculate(expression: str) -> str:
